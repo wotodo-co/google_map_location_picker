@@ -289,7 +289,7 @@ class MapPickerState extends State<MapPicker> {
 
       return {
         "placeId": response['results'][0]['place_id'],
-        "address": response['results'][0]['formatted_address'],
+        "address": response['results'][0]['formatted_address'].split(',')[0],
         "addressComponents": response['results'][0]['address_components']
       };
     } catch (e) {
