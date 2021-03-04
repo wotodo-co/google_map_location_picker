@@ -85,6 +85,8 @@ class MapPickerState extends State<MapPicker> {
 
   String _placeId;
 
+  dynamic _addressComponents;
+
   void _onToggleMapTypePressed() {
     final MapType nextType =
         MapType.values[(_currentMapType.index + 1) % MapType.values.length];
@@ -229,7 +231,7 @@ class MapPickerState extends State<MapPicker> {
                 children: <Widget>[
                   Flexible(
                     flex: 20,
-                    child: FutureLoadingBuilder<Map<String, String>>(
+                    child: FutureLoadingBuilder<Map<String, dynamic>>(
                       future: getAddress(locationProvider.lastIdleLocation),
                       mutable: true,
                       loadingIndicator: Row(
@@ -241,6 +243,7 @@ class MapPickerState extends State<MapPicker> {
                       builder: (context, data) {
                         _address = data["address"];
                         _placeId = data["placeId"];
+                        _addressComponents = data["addressComponents"];
                         return Text(
                           _address ??
                               S.of(context)?.unnamedPlace ??
@@ -258,6 +261,7 @@ class MapPickerState extends State<MapPicker> {
                           latLng: locationProvider.lastIdleLocation,
                           address: _address,
                           placeId: _placeId,
+                          addressComponents: AddressComponents.fromRawJson(_addressComponents)
                         )
                       });
                     },
@@ -273,7 +277,7 @@ class MapPickerState extends State<MapPicker> {
     );
   }
 
-  Future<Map<String, String>> getAddress(LatLng location) async {
+  Future<Map<String, dynamic>> getAddress(LatLng location) async {
     try {
       final endPoint =
           'https://maps.googleapis.com/maps/api/geocode/json?latlng=${location?.latitude},${location?.longitude}'
@@ -285,7 +289,8 @@ class MapPickerState extends State<MapPicker> {
 
       return {
         "placeId": response['results'][0]['place_id'],
-        "address": response['results'][0]['formatted_address']
+        "address": response['results'][0]['formatted_address'],
+        "addressComponents": response['results'][0]['address_components']
       };
     } catch (e) {
       print(e);
