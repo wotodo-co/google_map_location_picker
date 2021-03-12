@@ -254,7 +254,10 @@ class MapPickerState extends State<MapPicker> {
                     ),
                   ),
                   Spacer(),
-                  FloatingActionButton(
+                  ElevatedButton(
+                    style: ButtonStyle(
+                      backgroundColor: MaterialStateProperty.all<Color>(Colors.white),
+                    ),
                     onPressed: () {
                       Navigator.of(context).pop({
                         'location': LocationResult(
@@ -265,8 +268,7 @@ class MapPickerState extends State<MapPicker> {
                         )
                       });
                     },
-                    child: widget.resultCardConfirmIcon ??
-                        Icon(Icons.arrow_forward),
+                    child: Text('Potvrdit', style: TextStyle(color: Colors.black)),
                   ),
                 ],
               ),
