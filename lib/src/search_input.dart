@@ -80,7 +80,7 @@ class SearchInputState extends State<SearchInput> {
               decoration: InputDecoration(
                 hintText: widget.hintText ??
                     S.of(context)?.search_place ??
-                    'Search place',
+                    'Hledání',
                 border: InputBorder.none,
               ),
               onChanged: (value) {
