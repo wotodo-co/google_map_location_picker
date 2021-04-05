@@ -281,11 +281,11 @@ class MapPickerState extends State<MapPicker> {
 
   Future<Map<String, dynamic>> getAddress(LatLng location) async {
     try {
-      final endPoint =
+      final endpoint =
           'https://maps.googleapis.com/maps/api/geocode/json?latlng=${location?.latitude},${location?.longitude}'
           '&key=${widget.apiKey}&language=${widget.language}';
 
-      var response = jsonDecode((await http.get(endPoint,
+      final response = jsonDecode((await http.get(Uri.parse(endpoint),
               headers: await LocationUtils.getAppHeaders()))
           .body);
 
