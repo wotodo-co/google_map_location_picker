@@ -281,23 +281,36 @@ class MapPickerState extends State<MapPicker> {
 
   Future<Map<String, dynamic>> getAddress(LatLng location) async {
     try {
-      final endpoint =
-          'https://maps.googleapis.com/maps/api/geocode/json?latlng=${location?.latitude},${location?.longitude}'
-          '&key=${widget.apiKey}&language=${widget.language}';
-
-      final response = jsonDecode((await http.get(Uri.parse(endpoint),
-              headers: await LocationUtils.getAppHeaders()))
-          .body);
-
-      return {
-        "placeId": response['results'][0]['place_id'],
-        "address": response['results'][0]['formatted_address'].split(',')[0],
-        "addressComponents": response['results'][0]['address_components']
-      };
-    } catch (e) {
+      if (location != null) {
+        final response = await http.get(
+          Uri.https(
+            'api.geoapify.com', 
+            '/v1/geocode/reverse', 
+            {
+              "apiKey": "05670481f6a2403da2568a997d09a701", 
+              "lat": location?.latitude?.toString(),
+              "lon": location?.longitude?.toString(),
+              "lang": "cs"
+            }
+          )
+        );
+        final body = jsonDecode(response.body);
+        dynamic properties = body['features'][0]['properties'];
+        String address;
+        if (properties["street"] != null && properties["housenumber"] != null) {
+          address = "${properties['street']} ${properties['housenumber']}";
+        } else {
+          address = properties["formatted"].split(",")[0];
+        }
+        return {
+          "placeId": null,
+          "address": address,
+          "addressComponents": null
+        };
+      }
+    } catch(e) {
       print(e);
     }
-
     return {"placeId": null, "address": null};
   }
 
@@ -418,40 +431,6 @@ class MapPickerState extends State<MapPicker> {
         );
       },
     );
-  }
-
-  // TODO: 9/12/2020 this is no longer needed, remove in the next release
-  Future _checkGps() async {
-    if (!(await Geolocator.isLocationServiceEnabled())) {
-      if (Theme.of(context).platform == TargetPlatform.android) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text(S.of(context)?.cant_get_current_location ??
-                  "Can't get current location"),
-              content: Text(S
-                      .of(context)
-                      ?.please_make_sure_you_enable_gps_and_try_again ??
-                  'Please make sure you enable GPS and try again'),
-              actions: <Widget>[
-                FlatButton(
-                  child: Text('Ok'),
-                  onPressed: () {
-                    final AndroidIntent intent = AndroidIntent(
-                        action: 'android.settings.LOCATION_SOURCE_SETTINGS');
-
-                    intent.launch();
-                    Navigator.of(context, rootNavigator: true).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      }
-    }
   }
 }
 

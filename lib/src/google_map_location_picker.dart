@@ -9,14 +9,12 @@ import 'package:google_map_location_picker/src/map.dart';
 import 'package:google_map_location_picker/src/providers/location_provider.dart';
 import 'package:google_map_location_picker/src/rich_suggestion.dart';
 import 'package:google_map_location_picker/src/search_input.dart';
-import 'package:google_map_location_picker/src/utils/uuid.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import 'model/auto_comp_iete_item.dart';
+import 'model/autocomplete_item.dart';
 import 'model/location_result.dart';
-import 'model/nearby_place.dart';
 import 'utils/location_utils.dart';
 
 class LocationPicker extends StatefulWidget {
@@ -80,11 +78,6 @@ class LocationPickerState extends State<LocationPicker> {
   /// Overlay to display autocomplete suggestions
   OverlayEntry overlayEntry;
 
-  List<NearbyPlace> nearbyPlaces = List();
-
-  /// Session token required for autocomplete API call
-  String sessionToken = Uuid().generateV4();
-
   var mapKey = GlobalKey<MapPickerState>();
 
   var appBarKey = GlobalKey();
@@ -137,7 +130,7 @@ class LocationPickerState extends State<LocationPicker> {
                 SizedBox(width: 24),
                 Expanded(
                   child: Text(
-                    S.of(context)?.finding_place ?? 'Finding place...',
+                    S.of(context)?.finding_place ?? 'Hledáme...',
                     style: TextStyle(fontSize: 16),
                   ),
                 )
@@ -157,55 +150,48 @@ class LocationPickerState extends State<LocationPicker> {
   void autoCompleteSearch(String place) {
     place = place.replaceAll(" ", "+");
 
-    final countries = widget.countries;
-
-    // Currently, you can use components to filter by up to 5 countries. from https://developers.google.com/places/web-service/autocomplete
-    String regionParam = countries?.isNotEmpty == true
-        ? "&components=country:${countries.sublist(0, min(countries.length, 5)).join('|country:')}"
-        : "";
-
-    var endpoint =
-        "https://maps.googleapis.com/maps/api/place/autocomplete/json?" +
-            "key=${widget.apiKey}&" +
-            "input={$place}$regionParam&sessiontoken=$sessionToken&" +
-            "language=${widget.language}";
-
-    if (locationResult != null) {
-      endpoint += "&location=${locationResult.latLng.latitude}," +
-          "${locationResult.latLng.longitude}";
-    }
-
     LocationUtils.getAppHeaders()
-        .then((headers) => http.get(Uri.parse(endpoint), headers: headers))
+        .then((headers) => http.get(
+          Uri.https("api.geoapify.com", "/v1/geocode/autocomplete", {
+            "text": place,
+            "limit": "3",
+            "apiKey": "05670481f6a2403da2568a997d09a701",
+            "lang": "cs",
+            "filter": "circle:14.428442383831907,50.07967190218099,15000",
+            "bias": "countrycode:cs"
+          })))
         .then((response) {
       if (response.statusCode == 200) {
         Map<String, dynamic> data = jsonDecode(response.body);
-        List<dynamic> predictions = data['predictions'];
-
+        List<dynamic> predictions = data['features'];
         List<RichSuggestion> suggestions = [];
 
         if (predictions.isEmpty) {
           AutoCompleteItem aci = AutoCompleteItem();
-          aci.text = S.of(context)?.no_result_found ?? 'No result found';
-          aci.offset = 0;
-          aci.length = 0;
+          aci.text = S.of(context)?.no_result_found ?? 'Nic jsme nenalezli';
 
           suggestions.add(RichSuggestion(aci, () {}));
         } else {
           for (dynamic t in predictions) {
             AutoCompleteItem aci = AutoCompleteItem();
 
-            aci.id = t['place_id'];
-            aci.text = t['description'];
-            aci.offset = t['matched_substrings'][0]['offset'];
-            aci.length = t['matched_substrings'][0]['length'];
+            aci.id = t['properties']['place_id'];
+            aci.text = t['properties']['formatted'];
+            aci.latLng = LatLng(t['properties']['lat'], t['properties']['lon']);
 
             suggestions.add(RichSuggestion(aci, () {
-              decodeAndSelectPlace(aci.id);
+              clearOverlay();
+              moveToLocation(aci.latLng);
+              setState(() {
+                locationResult = LocationResult();
+                locationResult.address = aci.text;
+                locationResult.latLng = aci.latLng;
+                locationResult.placeId = aci.id;
+              });
             }));
           }
         }
-
+  
         displayAutoCompleteSuggestions(suggestions);
       }
     }).catchError((error) {
@@ -216,29 +202,6 @@ class LocationPickerState extends State<LocationPicker> {
   /// To navigate to the selected place from the autocomplete list to the map,
   /// the lat,lng is required. This method fetches the lat,lng of the place and
   /// proceeds to moving the map to that location.
-  void decodeAndSelectPlace(String placeId) {
-    clearOverlay();
-
-    final endpoint =
-        "https://maps.googleapis.com/maps/api/place/details/json?key=${widget.apiKey}" +
-            "&placeid=$placeId" +
-            '&language=${widget.language}';
-
-    LocationUtils.getAppHeaders()
-        .then((headers) => http.get(Uri.parse(endpoint), headers: headers))
-        .then((response) {
-      if (response.statusCode == 200) {
-        Map<String, dynamic> location =
-            jsonDecode(response.body)['result']['geometry']['location'];
-
-        LatLng latLng = LatLng(location['lat'], location['lng']);
-
-        moveToLocation(latLng);
-      }
-    }).catchError((error) {
-      print(error);
-    });
-  }
 
   /// Display autocomplete suggestions with the overlay.
   void displayAutoCompleteSuggestions(List<RichSuggestion> suggestions) {
@@ -265,102 +228,6 @@ class LocationPickerState extends State<LocationPicker> {
     Overlay.of(context).insert(overlayEntry);
   }
 
-  /// Utility function to get clean readable name of a location. First checks
-  /// for a human-readable name from the nearby list. This helps in the cases
-  /// that the user selects from the nearby list (and expects to see that as a
-  /// result, instead of road name). If no name is found from the nearby list,
-  /// then the road name returned is used instead.
-//  String getLocationName() {
-//    if (locationResult == null) {
-//      return "Unnamed location";
-//    }
-//
-//    for (NearbyPlace np in nearbyPlaces) {
-//      if (np.latLng == locationResult.latLng) {
-//        locationResult.name = np.name;
-//        return np.name;
-//      }
-//    }
-//
-//    return "${locationResult.name}, ${locationResult.locality}";
-//  }
-
-  /// Fetches and updates the nearby places to the provided lat,lng
-  void getNearbyPlaces(LatLng latLng) {
-    LocationUtils.getAppHeaders().then((headers) {
-      var endpoint =
-          "https://maps.googleapis.com/maps/api/place/nearbysearch/json?" +
-              "key=${widget.apiKey}&" +
-              "location=${latLng.latitude},${latLng.longitude}&radius=150" +
-              "&language=${widget.language}";
-
-      return http.get(Uri.parse(endpoint), headers: headers);
-    }).then((response) {
-      if (response.statusCode == 200) {
-        nearbyPlaces.clear();
-        for (Map<String, dynamic> item
-            in jsonDecode(response.body)['results']) {
-          NearbyPlace nearbyPlace = NearbyPlace();
-
-          nearbyPlace.name = item['name'];
-          nearbyPlace.icon = item['icon'];
-          double latitude = item['geometry']['location']['lat'];
-          double longitude = item['geometry']['location']['lng'];
-
-          LatLng _latLng = LatLng(latitude, longitude);
-
-          nearbyPlace.latLng = _latLng;
-
-          nearbyPlaces.add(nearbyPlace);
-        }
-      }
-
-      // to update the nearby places
-      setState(() {
-        // this is to require the result to show
-        hasSearchTerm = false;
-      });
-    }).catchError((error) {});
-  }
-
-  /// This method gets the human readable name of the location. Mostly appears
-  /// to be the road name and the locality.
-  Future reverseGeocodeLatLng(LatLng latLng) async {
-    final endpoint =
-        "https://maps.googleapis.com/maps/api/geocode/json?latlng=${latLng.latitude},${latLng.longitude}" +
-            "&key=${widget.apiKey}" +
-            "&language=${widget.language}";
-
-    final response = await http.get(Uri.parse(endpoint),
-        headers: await LocationUtils.getAppHeaders());
-
-    if (response.statusCode == 200) {
-      Map<String, dynamic> responseJson = jsonDecode(response.body);
-
-      String road;
-
-      String placeId = responseJson['results'][0]['place_id'];
-
-      if (responseJson['status'] == 'REQUEST_DENIED') {
-        road = 'REQUEST DENIED = please see log for more details';
-        print(responseJson['error_message']);
-      } else {
-        road =
-            responseJson['results'][0]['address_components'][0]['short_name'];
-      }
-
-//      String locality =
-//          responseJson['results'][0]['address_components'][1]['short_name'];
-
-      setState(() {
-        locationResult = LocationResult();
-        locationResult.address = road;
-        locationResult.latLng = latLng;
-        locationResult.placeId = placeId;
-      });
-    }
-  }
-
   /// Moves the camera to the provided location and updates other UI features to
   /// match the location.
   void moveToLocation(LatLng latLng) {
@@ -374,10 +241,6 @@ class LocationPickerState extends State<LocationPicker> {
         ),
       );
     });
-
-    reverseGeocodeLatLng(latLng);
-
-    getNearbyPlaces(latLng);
   }
 
   @override

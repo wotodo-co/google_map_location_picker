@@ -57,21 +57,5 @@ class AddressComponents {
     };
 
   AddressComponents.fromRawJson(List<dynamic> json) {
-    json.forEach((e) {
-      if (e['types'].contains('premise'))
-        streetNumber1 = e['long_name'];
-      else if (e['types'].contains('street_number'))
-        streetNumber2 = e['long_name'];
-      else if (e['types'].contains('route'))
-        streetName = e['long_name'];
-      else if (e['types'].contains('sublocality'))
-        sublocality = e['long_name'];
-      else if (e['types'].contains('postal_code'))
-        postalCode = e['long_name'];
-      else if (e['types'].contains('administrative_area_level_1'))
-        city = e['long_name'];
-      else if (e['types'].contains('country'))
-        country = e['long_name'];
-    });
   }
 }
