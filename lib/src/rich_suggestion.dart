@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'model/auto_comp_iete_item.dart';
+import 'model/autocomplete_item.dart';
 
 class RichSuggestion extends StatelessWidget {
   final VoidCallback onTap;
@@ -30,48 +30,17 @@ class RichSuggestion extends StatelessWidget {
   }
 
   List<TextSpan> getStyledTexts(BuildContext context) {
-    final List<TextSpan> result = [];
-
-    String startText =
-        autoCompleteItem.text.substring(0, autoCompleteItem.offset);
-    if (startText.isNotEmpty) {
-      result.add(
-        TextSpan(
-          text: startText,
+    // final List<TextSpan> result = [];
+    return [
+      TextSpan(
+          text: autoCompleteItem.text,
           style: TextStyle(
             color: Colors.grey,
             fontSize: 15,
             fontWeight: FontWeight.w300,
           ),
-        ),
-      );
-    }
+        )
+    ];
 
-    String boldText = autoCompleteItem.text.substring(autoCompleteItem.offset,
-        autoCompleteItem.offset + autoCompleteItem.length);
-
-    result.add(
-      TextSpan(
-        text: boldText,
-        style: TextStyle(
-          color: Colors.grey,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-
-    String remainingText = this
-        .autoCompleteItem
-        .text
-        .substring(autoCompleteItem.offset + autoCompleteItem.length);
-    result.add(
-      TextSpan(
-        text: remainingText,
-        style: TextStyle(color: Colors.grey, fontSize: 15),
-      ),
-    );
-
-    return result;
   }
 }
